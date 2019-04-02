@@ -1,10 +1,22 @@
 import React, { Component, Fragment } from 'react';
 import { StyleSheet, View, Text, Dimensions, Image } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
 import DATA from './data';
 
-const { add, sub, abs, interpolate, Extrapolate } = Animated;
+const {
+    add,
+    sub,
+    abs,
+    interpolate,
+    Extrapolate,
+    block,
+    set,
+    cond,
+    eq,
+    debug
+} = Animated;
 
 const windowWidth = Dimensions.get('window').width;
 const halfWindowWidth = windowWidth / 2;
@@ -145,35 +157,60 @@ class TilesRow extends Component {
 }
 
 export default class App extends Component {
-    animValX = new Animated.Value(0);
-    animValY = new Animated.Value(0);
-    _onScroll = Animated.event([
-        {
-            nativeEvent: {
-                contentOffset: { x: this.animValX, y: this.animValY }
+    constructor(props) {
+        super(props);
+        this.X = new Animated.Value(0);
+        this.Y = new Animated.Value(0);
+        const offsetX = new Animated.Value(0);
+        const offsetY = new Animated.Value(0);
+
+        this.handlePan = Animated.event([
+            {
+                nativeEvent: ({ translationX: x, translationY: y, state }) =>
+                    block([
+                        set(this.X, add(x, offsetX)),
+                        set(this.Y, add(y, offsetY)),
+                        cond(eq(state, State.END), [
+                            set(offsetX, add(offsetX, x)),
+                            set(offsetY, add(offsetY, y))
+                        ])
+                    ])
             }
-        }
-    ]);
+        ]);
+    }
 
     render() {
         return (
             <View style={styles.container}>
-                <Animated.ScrollView
-                    style={styles.scrollView}
-                    scrollEventThrottle={1}
-                    onScroll={this._onScroll}
+                <PanGestureHandler
+                    onGestureEvent={this.handlePan}
+                    onHandlerStateChange={this.handlePan}
                 >
-                    <View style={styles.scrollViewContent}>
+                    <Animated.View
+                        style={[
+                            styles.scrollViewContent,
+                            {
+                                transform: [
+                                    {
+                                        translateX: this.X
+                                    },
+                                    {
+                                        translateY: this.Y
+                                    }
+                                ]
+                            }
+                        ]}
+                    >
                         {chunk(DATA, numberOfColumns).map(chunk => (
                             <TilesRow
                                 key={chunk[0].firstName}
                                 chunkOfTiles={chunk}
-                                animValX={this.animValX}
-                                animValY={this.animValY}
+                                animValX={this.X}
+                                animValY={this.Y}
                             />
                         ))}
-                    </View>
-                </Animated.ScrollView>
+                    </Animated.View>
+                </PanGestureHandler>
                 <DebugCrossHairs isVisible={false} />
             </View>
         );
@@ -183,8 +220,8 @@ export default class App extends Component {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+        // justifyContent: 'center',
+        // alignItems: 'center',
         backgroundColor: '#000'
     },
     scrollView: {},
@@ -231,3 +268,5 @@ const styles = StyleSheet.create({
         backgroundColor: 'red'
     }
 });
+
+// <Animated.Code>{() => debug('lit', animXYVal)}</Animated.Code>
